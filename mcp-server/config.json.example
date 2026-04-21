@@ -1,0 +1,15 @@
+{
+  "uisp_url": "https://uisp.yourdomain.com",
+  "uisp_token": "your-uisp-api-key",
+  "airos_username": "ubnt",
+  "airos_password": "your-password",
+  "airos_ssl_verify": false,
+  "sweep_concurrency": 10,
+  "sweep_timeout": 15,
+  "device_overrides": {
+    "192.168.1.100": {
+      "username": "admin",
+      "password": "different-password"
+    }
+  }
+}
