@@ -22,8 +22,8 @@ When an airOS access point operating on a DFS-required channel (typically 5.2–
 
 ### DFS Detection
 
-**`detect_dfs(ip)`**
-The primary detection tool. Connects directly to an airOS device and compares its actual operating frequency against the UISP-configured frequency.
+**`detect_dfs(identifier)`**
+The primary detection tool. Accepts a device name, IP address, or UISP ID. Resolves to the management IP automatically, then connects directly to the device and compares its actual operating frequency against the UISP-configured frequency.
 - `configured_mhz`: What UISP says the device should be on
 - `actual_mhz`: What the device is actually running on
 - `dfs_event`: `true` if configured ≠ actual — the device was forced to a different channel by radar detection
@@ -44,11 +44,11 @@ Get detail for one device. Accepts device name (case-insensitive), IP address, o
 
 ### Supporting Radio Tools (direct airOS connection)
 
-**`get_clients(ip)`**
-Get the station table from an AP — all connected CPEs/clients. Sorted by signal strength (strongest first). Each entry includes MAC, IP, signal (dBm), noise floor (dBm), RSSI, distance, uptime, and remote hostname.
+**`get_clients(identifier)`**
+Get the station table from an AP — all connected CPEs/clients. Accepts a device name, IP, or UISP ID. Sorted by signal strength (strongest first). Each entry includes MAC, IP, signal (dBm), noise floor (dBm), RSSI, distance, uptime, and remote hostname.
 
-**`get_device_stats(ip)`**
-Get system health: hostname, model, firmware, uptime, CPU load, memory usage, temperature.
+**`get_device_stats(identifier)`**
+Get system health: hostname, model, firmware, uptime, CPU load, memory usage, temperature. Accepts a device name, IP, or UISP ID.
 
 **`sweep_clients(site=None)`**
 Sweep all APs (optionally filtered by site), connecting to each concurrently to collect client tables. Useful after a DFS reset to verify clients have reconnected. Unreachable APs are included with `status: "error"` — the sweep always returns partial results rather than failing.

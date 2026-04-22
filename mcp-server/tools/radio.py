@@ -24,9 +24,15 @@ def register_radio_tools(
 
     @mcp.tool(timeout=30.0)
     async def detect_dfs(
-        ip: Annotated[str, Field(description="Device IP address")],
+        identifier: Annotated[
+            str,
+            Field(description="Device name, IP address, or UISP device ID"),
+        ],
     ) -> dict[str, Any]:
         """Detect DFS radar events and frequency changes on an airOS device.
+
+        Accepts a device name, IP address, or UISP ID — resolves to the
+        management IP automatically before connecting.
 
         Connects directly to the device to read the actual operating frequency,
         and compares it against the configured frequency from UISP NMS.
@@ -39,6 +45,9 @@ def register_radio_tools(
         Returns configured_mhz (from UISP), actual_mhz (from device),
         dfs_event flag, channel_width, and IEEE mode.
         """
+        # Resolve identifier to IP address
+        ip = await uisp.resolve_ip(identifier)
+
         # Get configured frequency from UISP
         configured_mhz = await uisp.get_configured_frequency(ip)
 
@@ -56,6 +65,7 @@ def register_radio_tools(
         )
 
         return {
+            "ip": ip,
             "configured_mhz": configured_mhz,
             "actual_mhz": actual_mhz,
             "dfs_event": dfs_event,
@@ -66,9 +76,15 @@ def register_radio_tools(
 
     @mcp.tool(timeout=30.0)
     async def get_clients(
-        ip: Annotated[str, Field(description="AP device IP address")],
+        identifier: Annotated[
+            str,
+            Field(description="Device name, IP address, or UISP device ID"),
+        ],
     ) -> list[dict[str, Any]]:
         """Get all connected clients/stations for an airOS access point.
+
+        Accepts a device name, IP address, or UISP ID — resolves to the
+        management IP automatically before connecting.
 
         Connects directly to the AP and returns the station table sorted by
         signal strength (strongest first).
@@ -82,17 +98,25 @@ def register_radio_tools(
         - Poor: -75 to -80 dBm
         - Unusable: < -80 dBm
         """
+        ip = await uisp.resolve_ip(identifier)
         async with airos_session(ip, config) as status:
             return extract_clients(status)
 
     @mcp.tool(timeout=30.0)
     async def get_device_stats(
-        ip: Annotated[str, Field(description="Device IP address")],
+        identifier: Annotated[
+            str,
+            Field(description="Device name, IP address, or UISP device ID"),
+        ],
     ) -> dict[str, Any]:
         """Get system statistics for an airOS device.
+
+        Accepts a device name, IP address, or UISP ID — resolves to the
+        management IP automatically before connecting.
 
         Connects directly to the device and returns hostname, model, firmware
         version, uptime, CPU load, memory usage, and temperature.
         """
+        ip = await uisp.resolve_ip(identifier)
         async with airos_session(ip, config) as status:
             return extract_device_stats(status)

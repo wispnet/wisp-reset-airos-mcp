@@ -117,6 +117,25 @@ class UISPClient:
 
         return matches[0]
 
+    async def resolve_ip(self, identifier: str) -> str:
+        """Resolve any device identifier (name, IP, or UISP ID) to its management IP.
+
+        If the identifier is already a valid IP, it is returned as-is.
+        Otherwise, resolves via UISP and extracts the IP address.
+        Raises ToolError if the device cannot be found or has no IP.
+        """
+        if _IP_RE.match(identifier):
+            return identifier
+
+        device = await self.resolve_device(identifier)
+        ip = _get_ip(device)
+        if not ip:
+            name = device.get("identification", {}).get("name", identifier)
+            raise ToolError(
+                f"Device '{name}' found in UISP but has no IP address."
+            )
+        return ip
+
     async def get_configured_frequency(self, identifier: str) -> int | None:
         """Get the configured frequency for a device from UISP.
 
