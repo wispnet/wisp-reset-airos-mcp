@@ -150,7 +150,8 @@ class UISPClient:
 
 
 def _get_ip(device: dict) -> str | None:
-    """Extract IP address from a UISP device dict."""
-    return device.get("ipAddress") or (
+    """Extract IP address from a UISP device dict (strips CIDR notation)."""
+    ip = device.get("ipAddress") or (
         device.get("identification", {}).get("ipAddress")
     )
+    return ip.split("/")[0] if ip else None

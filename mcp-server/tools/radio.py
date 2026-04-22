@@ -56,12 +56,18 @@ def register_radio_tools(
             freq_info = extract_frequency_info(status)
 
         actual_mhz = freq_info.get("actual_mhz")
+        center_freq_mhz = freq_info.get("center_freq_mhz")
+        observed_mhz = center_freq_mhz if center_freq_mhz is not None else actual_mhz
 
-        # DFS detection: configured != actual means device moved channels
+        # airOS can report the control-side frequency separately from the channel
+        # center frequency on wider channels (for example VHT40 can appear +/-10 MHz).
+        # Compare UISP configured frequency to the observed center frequency when
+        # available, falling back to the raw radio frequency only when no center is
+        # reported.
         dfs_event = (
             configured_mhz is not None
-            and actual_mhz is not None
-            and configured_mhz != actual_mhz
+            and observed_mhz is not None
+            and configured_mhz != observed_mhz
         )
 
         return {
@@ -70,7 +76,7 @@ def register_radio_tools(
             "actual_mhz": actual_mhz,
             "dfs_event": dfs_event,
             "channel_width_mhz": freq_info.get("channel_width_mhz"),
-            "center_freq_mhz": freq_info.get("center_freq_mhz"),
+            "center_freq_mhz": center_freq_mhz,
             "ieee_mode": freq_info.get("ieee_mode"),
         }
 
