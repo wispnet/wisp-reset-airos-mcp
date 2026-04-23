@@ -1,15 +1,16 @@
 services:
   dfs-reset:
     build: .
+    container_name: dfs-reset
     command: ["python", "server.py", "--http", "--port", "8080"]
     ports:
-      - "8080:8080"
-    environment:
-      - WISP_UISP_URL=${WISP_UISP_URL}
-      - WISP_UISP_TOKEN=${WISP_UISP_TOKEN}
-      - WISP_AIROS_USERNAME=${WISP_AIROS_USERNAME:-ubnt}
-      - WISP_AIROS_PASSWORD=${WISP_AIROS_PASSWORD:-ubnt}
-      - WISP_AIROS_SSL_VERIFY=${WISP_AIROS_SSL_VERIFY:-false}
+      - "127.0.0.1:18083:8080"
     volumes:
       - ./config.json:/app/config.json:ro
     restart: unless-stopped
+    networks:
+      - dfs-reset-net
+
+networks:
+  dfs-reset-net:
+    name: dfs-reset-net
