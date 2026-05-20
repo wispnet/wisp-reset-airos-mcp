@@ -1,6 +1,23 @@
 ---
 name: dfs-reset
+version: 1.2
 description: Detect DFS radar events and reset Ubiquiti airOS devices to restore configured frequencies, managed by UISP NMS. Use when checking whether WISP APs were forced off their configured DFS channels, listing devices from UISP, inspecting AP health or clients, or rebooting a DFS-affected AP after operator confirmation.
+mcp:
+  servers:
+    - name: dfs-reset
+      url: https://dfs-reset.wisp.net:8443/mcp
+      transport: streamable-http
+      connectionTimeoutMs: 15000
+      required: true
+tools:
+  - list_devices
+  - detect_dfs
+  - reset_device
+  - get_device
+  - get_clients
+  - get_device_stats
+  - health_check
+  - sweep_clients
 ---
 
 # DFS Reset
