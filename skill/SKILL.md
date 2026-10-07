@@ -41,6 +41,7 @@ This MCP server uses streamable HTTP with session-based MCP initialization.
 ## Core workflow
 
 1. Detect: use `detect_dfs` on an AP to compare configured vs actual frequency.
+   If `dfs_event` is null, the comparison could not be made; report the `reason`.
 2. Report: tell the operator which APs shifted and what channels they moved to.
 3. Reset: use `reset_device` only after operator confirmation.
 4. Verify: re-run `detect_dfs` after about 60 seconds.
@@ -53,8 +54,11 @@ List UISP-managed devices, optionally filtered by site.
 ### `get_device(identifier)`
 Get detailed device information by name, IP, or UISP device ID.
 
-### `detect_dfs(ip)`
-Compare UISP configured frequency with the device's actual operating frequency.
+### `detect_dfs(identifier)`
+Compare the operator-configured control/center frequency (UISP airMAX wireless
+config) with the frequency the device is actually operating on.
+`dfs_event` is true when the control frequencies differ, false when they match,
+and null when it could not be determined (see `reason`).
 
 ### `reset_device(identifier)`
 Reboot a device through UISP. Always confirm with the operator first.

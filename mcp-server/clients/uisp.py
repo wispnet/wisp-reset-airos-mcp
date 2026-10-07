@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from typing import Any
 
@@ -10,8 +11,11 @@ from fastmcp.exceptions import ToolError
 
 from config import WispConfig
 
-# UUID pattern for UISP device IDs
-_UUID_RE = re.compile(r"^[0-9a-f]{24,}$", re.IGNORECASE)
+# UUID pattern for UISP device IDs (hyphenated GUIDs, or bare hex)
+_UUID_RE = re.compile(
+    r"^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{24,})$",
+    re.IGNORECASE,
+)
 # Simple IPv4 pattern
 _IP_RE = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
 
@@ -84,7 +88,7 @@ class UISPClient:
         if _IP_RE.match(identifier):
             matches = [
                 d for d in devices
-                if _get_ip(d) == identifier
+                if get_device_ip(d) == identifier
             ]
         else:
             # Try name match (case-insensitive exact, then partial)
@@ -128,7 +132,7 @@ class UISPClient:
             return identifier
 
         device = await self.resolve_device(identifier)
-        ip = _get_ip(device)
+        ip = get_device_ip(device)
         if not ip:
             name = device.get("identification", {}).get("name", identifier)
             raise ToolError(
@@ -136,20 +140,61 @@ class UISPClient:
             )
         return ip
 
-    async def get_configured_frequency(self, identifier: str) -> int | None:
-        """Get the configured frequency for a device from UISP.
+    async def get_wireless_config(self, device_id: str) -> dict[str, Any]:
+        """Get the saved airMAX wireless config for a device by its UISP ID.
 
-        Returns frequency in MHz or None if not available.
+        This is the operator-configured state (UISP reads the device's
+        /tmp/system.cfg), not what the radio is currently operating on.
+        Raises ToolError if UISP cannot return it (device offline, not airMAX, ...).
         """
-        device = await self.resolve_device(identifier)
-        overview = device.get("overview", {}) or {}
-        freq = overview.get("frequency")
-        if freq is not None:
-            return int(freq)
+        async with self._client() as client:
+            try:
+                resp = await client.get(f"/devices/airmaxes/{device_id}/config/wireless")
+            except httpx.HTTPError as e:
+                raise ToolError(f"Error fetching wireless config from UISP: {e}")
+        if resp.status_code != 200:
+            raise ToolError(
+                f"UISP returned HTTP {resp.status_code} for the wireless config "
+                f"of device {device_id}."
+            )
+        try:
+            data = resp.json()
+        except ValueError:
+            data = None
+        if not isinstance(data, dict):
+            raise ToolError(f"UISP returned no wireless config for device {device_id}.")
+        return data
+
+    async def get_configured_frequency(self, device_id: str) -> dict[str, Any]:
+        """Get the operator-configured frequency settings for an airMAX device.
+
+        Reads GET /devices/airmaxes/{id}/config/wireless. Do not use
+        overview.frequency from /devices for this: UISP documents it as the
+        *current* frequency, so it moves along with the radio after a DFS hit.
+
+        Returns control_mhz, center_mhz and channel_width_mhz (MHz, or None when
+        not set; UISP reports 0 for unset values and for stations) and mode.
+        """
+        wireless = await self.get_wireless_config(device_id)
+        return {
+            "control_mhz": _mhz(wireless.get("controlFrequency")),
+            "center_mhz": _mhz(wireless.get("centerFrequency")),
+            "channel_width_mhz": _mhz(wireless.get("channelWidth")),
+            "mode": wireless.get("mode"),
+        }
+
+
+def _mhz(value: Any) -> int | None:
+    """Coerce a UISP frequency/width value to int MHz; 0 or non-numeric -> None."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
+    if not math.isfinite(value):
+        return None
+    mhz = int(value)
+    return mhz if mhz > 0 else None
 
 
-def _get_ip(device: dict) -> str | None:
+def get_device_ip(device: dict) -> str | None:
     """Extract IP address from a UISP device dict (strips CIDR notation)."""
     ip = device.get("ipAddress") or (
         device.get("identification", {}).get("ipAddress")
