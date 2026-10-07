@@ -44,7 +44,8 @@ def register_nms_tools(mcp: FastMCP, uisp: UISPClient) -> None:
         """List all UISP-managed devices. Optionally filter by site name.
 
         Returns a summary of each device including name, model, IP, site,
-        status, firmware version, and configured frequency.
+        status, firmware version, and current operating frequency (as last
+        reported to UISP; use detect_dfs to compare against the configured one).
         """
         devices = await uisp.list_devices(site=site)
         return [_simplify_device(d) for d in devices]

@@ -12,7 +12,9 @@ The fix is simple (reboot the AP), but finding which devices have been hit acros
 
 dfs-reset is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that gives Claude (or any MCP-compatible AI assistant) direct access to your UISP NMS and airOS devices. The core workflow is:
 
-1. **Detect** — `detect_dfs` connects to an AP and compares its actual operating frequency against what UISP says it should be on. If they differ, a DFS event has occurred.
+1. **Detect** — `detect_dfs` reads the frequency the operator configured (UISP's airMAX wireless config, `/devices/airmaxes/{id}/config/wireless`, which UISP reads from the device's saved configuration) and compares it against the frequency the AP is actually operating on, read directly from the radio. Control frequency is compared with control frequency, and center with center. If the control frequencies differ, a DFS event has occurred.
+
+   Note: UISP's `overview.frequency` from `/devices` is the *current* operating frequency, so it follows the radio after a DFS move and cannot be used as the configured value.
 2. **Report** — The assistant tells you which APs shifted, what channels they moved to, and whether action is needed.
 3. **Reset** — `reset_device` reboots the AP (with your confirmation), forcing it back to its configured frequency.
 4. **Verify** — `detect_dfs` again to confirm the device returned to the correct channel.
@@ -21,7 +23,7 @@ dfs-reset is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) 
 
 | Tool | Description |
 |------|-------------|
-| `detect_dfs(ip)` | Compare configured vs. actual frequency; flag DFS radar events |
+| `detect_dfs(identifier)` | Compare configured (UISP wireless config) vs. actual (device) control/center frequency; flag DFS radar events |
 | `reset_device(identifier)` | Reboot a device to restore its configured frequency (requires confirmation) |
 | `list_devices(site?)` | List managed devices from UISP, optionally filtered by site |
 | `get_device(identifier)` | Get details for a specific device by name, IP, or UISP ID |

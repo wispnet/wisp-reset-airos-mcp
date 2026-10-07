@@ -67,11 +67,14 @@ async def airos_session(ip: str, config: WispConfig):
 def extract_frequency_info(status: Any) -> dict[str, Any]:
     """Extract frequency information from airOS status data."""
     wireless = status.wireless
+    ieee_mode = getattr(wireless, "ieeemode", None)
     return {
+        # Control (primary 20 MHz) channel frequency the radio is operating on
         "actual_mhz": getattr(wireless, "frequency", None),
         "channel_width_mhz": getattr(wireless, "chanbw", None),
+        # Center of the whole (e.g. 40/80 MHz) channel
         "center_freq_mhz": getattr(wireless, "center1_freq", None),
-        "ieee_mode": str(getattr(wireless, "ieeemode", "unknown")),
+        "ieee_mode": str(getattr(ieee_mode, "value", ieee_mode) or "unknown"),
     }
 
 

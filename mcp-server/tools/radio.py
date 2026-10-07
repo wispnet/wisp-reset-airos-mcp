@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 from pydantic import Field
 
 from clients.airos import (
@@ -13,7 +14,7 @@ from clients.airos import (
     extract_device_stats,
     extract_frequency_info,
 )
-from clients.uisp import UISPClient
+from clients.uisp import UISPClient, get_device_ip
 from config import WispConfig
 
 
@@ -31,52 +32,104 @@ def register_radio_tools(
     ) -> dict[str, Any]:
         """Detect DFS radar events and frequency changes on an airOS device.
 
-        Accepts a device name, IP address, or UISP ID — resolves to the
-        management IP automatically before connecting.
+        Accepts a device name, IP address, or UISP ID — resolves the device in
+        UISP and connects to its management IP.
 
-        Connects directly to the device to read the actual operating frequency,
-        and compares it against the configured frequency from UISP NMS.
+        The configured frequency comes from the airMAX wireless config the
+        operator saved (UISP /devices/airmaxes/{id}/config/wireless). The
+        actual frequency is read directly from the device. Like is compared
+        with like: configured control frequency vs the radio's control
+        frequency, and configured center frequency vs the radio's center
+        frequency (only when the configured and actual channel widths match).
 
-        If configured and actual frequencies differ, dfs_event is set to true,
-        indicating the device was forced off its configured channel by
-        a DFS radar detection event and needs a reset to return to its
-        intended frequency.
+        If the control frequencies differ, dfs_event is true: the device was
+        forced off its configured channel, typically by a DFS radar detection,
+        and needs a reset to return to its intended frequency. dfs_event is
+        null when the comparison could not be made (e.g. the device is a
+        station, or UISP has no saved frequency for it); reason says why.
 
-        Returns configured_mhz (from UISP), actual_mhz (from device),
-        dfs_event flag, channel_width, and IEEE mode.
+        Returns configured_mhz / configured_center_mhz /
+        configured_channel_width_mhz (from UISP config), actual_mhz /
+        center_freq_mhz / channel_width_mhz (from the device), the dfs_event
+        flag, center_mismatch, reason, and IEEE mode.
         """
-        # Resolve identifier to IP address
-        ip = await uisp.resolve_ip(identifier)
+        device = await uisp.resolve_device(identifier)
+        ident = device.get("identification", {}) or {}
+        ip = get_device_ip(device)
+        if not ip:
+            raise ToolError(
+                f"Device '{ident.get('name', identifier)}' found in UISP but has no IP address."
+            )
 
-        # Get configured frequency from UISP
-        configured_mhz = await uisp.get_configured_frequency(ip)
+        # Operator-configured settings, from UISP's airMAX wireless config
+        configured: dict[str, Any] = {}
+        config_error = None
+        try:
+            configured = await uisp.get_configured_frequency(ident.get("id"))
+        except ToolError as e:
+            config_error = str(e)
 
-        # Get actual frequency from device
+        # Current operating settings, read directly from the device
         async with airos_session(ip, config) as status:
             freq_info = extract_frequency_info(status)
 
+        configured_mhz = configured.get("control_mhz")
+        configured_center_mhz = configured.get("center_mhz")
+        configured_width_mhz = configured.get("channel_width_mhz")
+        mode = str(configured.get("mode") or "")
+
         actual_mhz = freq_info.get("actual_mhz")
         center_freq_mhz = freq_info.get("center_freq_mhz")
-        observed_mhz = center_freq_mhz if center_freq_mhz is not None else actual_mhz
+        channel_width_mhz = freq_info.get("channel_width_mhz")
 
-        # airOS can report the control-side frequency separately from the channel
-        # center frequency on wider channels (for example VHT40 can appear +/-10 MHz).
-        # Compare UISP configured frequency to the observed center frequency when
-        # available, falling back to the raw radio frequency only when no center is
-        # reported.
-        dfs_event = (
-            configured_mhz is not None
-            and observed_mhz is not None
-            and configured_mhz != observed_mhz
-        )
+        # The center frequency only lines up when both sides use the same width.
+        center_mismatch = None
+        if (
+            configured_center_mhz
+            and center_freq_mhz
+            and configured_width_mhz
+            and configured_width_mhz == channel_width_mhz
+        ):
+            center_mismatch = configured_center_mhz != center_freq_mhz
+
+        reason = None
+        if config_error:
+            dfs_event = None
+            reason = f"Could not read configured frequency from UISP: {config_error}"
+        elif mode.startswith("sta"):
+            dfs_event = None
+            reason = "Device is a station; it follows its AP's channel."
+        elif not configured_mhz:
+            dfs_event = None
+            reason = "UISP config has no configured control frequency for this device."
+        elif not actual_mhz:
+            dfs_event = None
+            reason = "Device did not report its operating frequency."
+        else:
+            dfs_event = configured_mhz != actual_mhz
+            if dfs_event:
+                reason = (
+                    f"Operating on {actual_mhz} MHz, configured for {configured_mhz} MHz."
+                )
+            elif center_mismatch:
+                reason = (
+                    f"Control frequency matches, but center is {center_freq_mhz} MHz "
+                    f"vs configured {configured_center_mhz} MHz."
+                )
 
         return {
             "ip": ip,
+            "device_id": ident.get("id"),
+            "name": ident.get("name"),
             "configured_mhz": configured_mhz,
+            "configured_center_mhz": configured_center_mhz,
+            "configured_channel_width_mhz": configured_width_mhz,
             "actual_mhz": actual_mhz,
-            "dfs_event": dfs_event,
-            "channel_width_mhz": freq_info.get("channel_width_mhz"),
             "center_freq_mhz": center_freq_mhz,
+            "channel_width_mhz": channel_width_mhz,
+            "dfs_event": dfs_event,
+            "center_mismatch": center_mismatch,
+            "reason": reason,
             "ieee_mode": freq_info.get("ieee_mode"),
         }
 

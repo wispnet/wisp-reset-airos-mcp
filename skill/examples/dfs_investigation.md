@@ -17,13 +17,13 @@ Operator reports that some clients at a site are experiencing intermittent conne
 
 **Step 2: Detect DFS events on each AP**
 ```
-→ detect_dfs(ip="10.0.1.10")
+→ detect_dfs(identifier="10.0.1.10")
 ← {configured_mhz: 5745, actual_mhz: 5745, dfs_event: false, ...}
 
-→ detect_dfs(ip="10.0.1.11")
+→ detect_dfs(identifier="10.0.1.11")
 ← {configured_mhz: 5580, actual_mhz: 5660, dfs_event: true, ...}
 
-→ detect_dfs(ip="10.0.1.12")
+→ detect_dfs(identifier="10.0.1.12")
 ← {configured_mhz: 5500, actual_mhz: 5500, dfs_event: false, ...}
 ```
 
@@ -40,7 +40,7 @@ Operator reports that some clients at a site are experiencing intermittent conne
 
 **Step 5: Verify recovery (~60 seconds later)**
 ```
-→ detect_dfs(ip="10.0.1.11")
+→ detect_dfs(identifier="10.0.1.11")
 ← {configured_mhz: 5580, actual_mhz: 5580, dfs_event: false, ...}
 ```
 

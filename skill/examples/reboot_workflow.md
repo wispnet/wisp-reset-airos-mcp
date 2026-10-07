@@ -14,7 +14,7 @@ Operator reports that an AP seems unresponsive to clients but is still pingable.
 
 **Step 2: Check for DFS event and current state**
 ```
-→ detect_dfs(ip="10.0.3.15")
+→ detect_dfs(identifier="10.0.3.15")
 ← {configured_mhz: 5580, actual_mhz: 5580, dfs_event: false, ...}
 
 → get_device_stats(ip="10.0.3.15")
@@ -43,7 +43,7 @@ Operator reports that an AP seems unresponsive to clients but is still pingable.
 
 **Step 5: Verify recovery (~60 seconds later)**
 ```
-→ detect_dfs(ip="10.0.3.15")
+→ detect_dfs(identifier="10.0.3.15")
 ← {configured_mhz: 5580, actual_mhz: 5580, dfs_event: false, ...}
 
 → get_device_stats(ip="10.0.3.15")
