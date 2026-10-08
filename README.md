@@ -30,6 +30,7 @@ dfs-reset is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) 
 | `get_clients(ip)` | Get connected stations/CPEs from an AP, sorted by signal strength |
 | `get_device_stats(ip)` | Get system health: CPU, memory, temperature, uptime |
 | `sweep_clients(site?)` | Concurrent scan of all APs to collect a unified client table |
+| `health_check()` | Check that UISP is reachable and the API token works; report response time, device count, and whether airOS credentials are configured |
 
 ## Setup
 
@@ -76,7 +77,9 @@ cd mcp-server
 docker compose up -d
 ```
 
-This exposes the server over HTTP on port 8080.
+This runs the server over HTTP on port 8080 inside the container, published on the host at `127.0.0.1:18083`.
+
+In HTTP mode the server also answers `GET /health` with `{"status": "ok", "server": "dfs-reset"}`. It makes no UISP or device calls, so it is safe for uptime monitors and reverse-proxy checks, and `docker compose` uses it as the container healthcheck. To check UISP connectivity and the API token, call the `health_check` tool.
 
 ### Connect to Claude Desktop
 
@@ -119,6 +122,7 @@ mcp-server/
     nms.py            # list_devices, get_device, reset_device
     radio.py          # detect_dfs, get_clients, get_device_stats
     sweep.py          # sweep_clients
+    health.py         # health_check, GET /health
 skill/
   SKILL.md            # Claude skill definition with workflows and guidelines
   examples/           # Example tool flows for common scenarios

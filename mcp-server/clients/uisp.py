@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+import time
 from typing import Any
 
 import httpx
@@ -51,6 +52,53 @@ class UISPClient:
             ]
 
         return devices
+
+    async def health(self) -> dict[str, Any]:
+        """Check UISP reachability and API token validity with one GET /devices.
+
+        Never raises: problems are reported in the returned dict's "error".
+        """
+        result: dict[str, Any] = {
+            "api_url": self._base_url,
+            "reachable": False,
+            "authenticated": None,
+            "latency_ms": None,
+            "device_count": None,
+            "error": None,
+        }
+        start = time.perf_counter()
+        try:
+            async with self._client() as client:
+                resp = await client.get("/devices")
+        except httpx.HTTPError as e:
+            result["error"] = f"Cannot reach UISP: {str(e) or type(e).__name__}"
+            return result
+
+        result["reachable"] = True
+        result["latency_ms"] = round((time.perf_counter() - start) * 1000)
+        if resp.status_code in (401, 403):
+            result["authenticated"] = False
+            result["error"] = f"UISP rejected the API token (HTTP {resp.status_code})."
+            return result
+        if resp.status_code != 200:
+            result["error"] = (
+                f"UISP returned HTTP {resp.status_code} for {self._base_url}/devices."
+            )
+            return result
+
+        try:
+            devices = resp.json()
+        except ValueError:
+            devices = None
+        if not isinstance(devices, list):
+            result["error"] = (
+                f"{self._base_url}/devices did not return a device list; check uisp_url."
+            )
+            return result
+
+        result["authenticated"] = True
+        result["device_count"] = len(devices)
+        return result
 
     async def get_device(self, device_id: str) -> dict[str, Any]:
         """Get a single device by its UISP ID."""
