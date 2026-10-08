@@ -46,6 +46,9 @@ This MCP server uses streamable HTTP with session-based MCP initialization.
 3. Reset: use `reset_device` only after operator confirmation.
 4. Verify: re-run `detect_dfs` after about 60 seconds.
 
+If tools fail with UISP errors, or `detect_dfs` reports that it could not read
+the UISP config, run `health_check` before troubleshooting individual devices.
+
 ## Tool reference
 
 ### `list_devices(site=None)`
@@ -71,6 +74,12 @@ Fetch AP health details including uptime, CPU, memory, and temperature.
 
 ### `sweep_clients(site=None)`
 Collect client tables across APs concurrently.
+
+### `health_check()`
+Check that the server can reach UISP and that its API token works. Returns
+`status` ("ok" or "error"), UISP reachability, token validity, response time
+and device count, and whether airOS credentials are configured (never the
+credentials themselves). Logs in to no devices.
 
 ## Safety rules
 
